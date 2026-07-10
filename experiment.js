@@ -1,54 +1,69 @@
-// STEP 2: Different frequencies for x and y = Lissajous curve
-// Goal: see how x and y "racing" at different speeds creates loops instead of a circle
+// STEP 3: Randomness + rotation
+// Goal: instead of ONE dot tracing ONE curve, draw MANY shapes,
+// each one randomly rotated and randomly placed near the curve
 
-let t = 0;          // our angle/time variable, starts at 0
-let speed = 0.02;    // how much t increases each frame
-let radius = 150;    // size of the curve
+let t = 0;           // our angle/time variable
+let speed = 0.01;     // slower now, since we're drawing more per frame
+let radius = 150;     // size of the curve
 
-let a = 5;  // frequency multiplier for x - try changing this number later
-let b = 7;  // frequency multiplier for y - try changing this number later
-
-let trail = [];        // an empty array to store every point the dot has visited
-let maxTrailLength = 500; // how many past points we keep before erasing old ones
+let a = 2;  // frequency multiplier for x
+let b = 3;  // frequency multiplier for y
 
 function setup() {
-  createCanvas(600, 600);  // makes a 600x600 pixel canvas
-  angleMode(RADIANS);      // use radians (not degrees) for cos/sin
+  createCanvas(600, 600);  // 600x600 canvas
+  angleMode(RADIANS);      // use radians for cos/sin
 }
 
 function draw() {
-  background(240);  // clear the frame each time (light gray)
+  background(240, 20);
+  // ^ note the second number (20) - this is a low-opacity background
+  // instead of fully clearing each frame, it slightly fades the old frame
+  // this creates a "trailing" ghost effect from past frames stacking up
 
   translate(width / 2, height / 2);
-  // ^ move origin to center of canvas so the curve draws around the middle
+  // move origin to center of canvas
 
-  // THE CORE CHANGE FROM STEP 1:
-  // in step 1, both x and y used the SAME t (so it was a=1, b=1, a perfect circle)
-  // now x uses "a * t" and y uses "b * t" - two DIFFERENT speeds
-  let x = radius * cos(a * t);  // x oscillates at rate "a"
-  let y = radius * sin(b * t);  // y oscillates at rate "b" (different from a!)
+  // loop 40 times per frame - each loop draws ONE shape near the curve
+  for (let i = 0; i < 40; i++) {
 
-  trail.push({ x: x, y: y });
-  // ^ save this frame's point into our trail array, so we can draw the path so far
+    // same core Lissajous math from step 2, still driving the base position
+    let x = radius * cos(a * t);  // base x position from the curve
+    let y = radius * sin(b * t);  // base y position from the curve
 
-  if (trail.length > maxTrailLength) {
-    trail.shift();  // remove the oldest point once we have too many (keeps memory in check)
+    // NEW: random jitter added to x and y
+    // random(-30, 30) picks a random number between -30 and 30 each time its called
+    // this scatters each shape slightly away from the exact curve point
+    let jitterX = x + random(-30, 30);
+    let jitterY = y + random(-30, 30);
+
+    push();
+    // ^ save the current drawing state (position, rotation) so our changes
+    // below don't permanently affect anything drawn after this loop iteration
+
+    translate(jitterX, jitterY);
+    // move to this shape's specific jittered position
+
+    // NEW: random rotation
+    // random(TWO_PI) picks a random angle between 0 and 2π (a full circle)
+    // rotate() spins the coordinate system by that angle before we draw
+    rotate(random(TWO_PI));
+
+    // NEW: random size and transparency for variety
+    let size = random(10, 40);       // random diameter each time
+    let alpha = random(50, 150);      // random transparency (0=invisible, 255=solid)
+
+    noStroke();                       // no outline on the shape
+    fill(80, 80, 200, alpha);         // blue-ish fill, with randomized transparency
+    ellipse(0, 0, size, size * 0.4);
+    // ^ draw an ellipse AT THE ORIGIN (0,0) - because we already translated
+    // to jitterX/jitterY above, "0,0" here actually means "the jittered point"
+    // size*0.4 makes it a flattened oval instead of a perfect circle, since
+    // it's now rotated randomly, flattened ellipses look more dynamic than circles
+
+    pop();
+    // ^ restore the drawing state back to before this loop's translate/rotate
+    // without this, rotations and translations would STACK UP across iterations
   }
 
-  // draw the trail as connected line segments
-  noFill();               // don't fill the shape, just draw the outline path
-  stroke(80, 80, 200);    // a blue-ish line color
-  strokeWeight(2);        // line thickness
-  beginShape();           // start defining a custom multi-point shape
-  for (let i = 0; i < trail.length; i++) {
-    vertex(trail[i].x, trail[i].y);  // add each stored point as a vertex in the shape
-  }
-  endShape();  // finish drawing the connected path
-
-  // draw the current dot on top, so you can see WHERE on the curve we are right now
-  fill(0);            // black fill
-  noStroke();          // no outline
-  circle(x, y, 10);    // small circle at current (x,y) position
-
-  t += speed;  // advance time so next frame draws a new point further along the curve
+  t += speed;  // advance time, so next frame's 40 shapes sit at a new curve position
 }
