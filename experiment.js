@@ -1,69 +1,97 @@
-// STEP 3: Randomness + rotation
-// Goal: instead of ONE dot tracing ONE curve, draw MANY shapes,
-// each one randomly rotated and randomly placed near the curve
+// STEP 5 (full window version)
+// Same as before, but canvas and noise texture now match the actual browser window
 
-let t = 0;           // our angle/time variable
-let speed = 0.01;     // slower now, since we're drawing more per frame
-let radius = 150;     // size of the curve
+let t = 0;
+let speed = 0.01;
+let radius;  // no longer a fixed number - we'll calculate this based on window size
 
-let a = 2;  // frequency multiplier for x
-let b = 3;  // frequency multiplier for y
+let a = 2;
+let b = 3;
+
+let seed = 42;
+let noiseTexture;
 
 function setup() {
-  createCanvas(600, 600);  // 600x600 canvas
-  angleMode(RADIANS);      // use radians for cos/sin
+  createCanvas(windowWidth, windowHeight);
+  // ^ windowWidth/windowHeight are built-in p5 variables that hold the ACTUAL
+  // browser window's pixel size - so the canvas always fills the screen exactly
+
+  colorMode(HSB, 360, 100, 100, 100);
+
+  radius = min(windowWidth, windowHeight) * 0.3;
+  // ^ base the curve's size on whichever dimension is smaller (width or height)
+  // this keeps the curve proportional and fully visible on any screen shape
+
+  background(270, 15, 98);
+
+  noiseTexture = createGraphics(windowWidth, windowHeight);
+  // ^ texture layer now matches the canvas size exactly - this is the actual fix
+  // before, it was hardcoded to 600x600 while the canvas was some other size
+
+  noiseTexture.colorMode(HSB, 360, 100, 100, 100);
+
+  randomSeed(seed);
+  noiseSeed(seed);
+
+  noiseTexture.loadPixels();
+  for (let i = 0; i < windowWidth; i++) {       // loop across the REAL window width
+    for (let j = 0; j < windowHeight; j++) {    // loop across the REAL window height
+      let n = noise(i / 8, j / 8);
+      let grainAlpha = map(n, 0, 1, 0, 12);
+      noiseTexture.set(i, j, color(20, 10, 10, grainAlpha));
+    }
+  }
+  noiseTexture.updatePixels();
 }
-
 function draw() {
-  background(240, 20);
-  // ^ note the second number (20) - this is a low-opacity background
-  // instead of fully clearing each frame, it slightly fades the old frame
-  // this creates a "trailing" ghost effect from past frames stacking up
+  fill(270, 15, 98, 8);
+  noStroke();
+  rect(0, 0, width, height);
 
-  translate(width / 2, height / 2);
-  // move origin to center of canvas
+  push();  // NEW: save the untransformed state before we shift the origin
+  translate(width / 2, height / 2);  // move origin to center - ONLY for the shapes below
 
-  // loop 40 times per frame - each loop draws ONE shape near the curve
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 25; i++) {
+    let x = radius * cos(a * t);
+    let y = radius * sin(b * t);
 
-    // same core Lissajous math from step 2, still driving the base position
-    let x = radius * cos(a * t);  // base x position from the curve
-    let y = radius * sin(b * t);  // base y position from the curve
-
-    // NEW: random jitter added to x and y
-    // random(-30, 30) picks a random number between -30 and 30 each time its called
-    // this scatters each shape slightly away from the exact curve point
-    let jitterX = x + random(-30, 30);
-    let jitterY = y + random(-30, 30);
+    let jitterX = x + random(-40, 40);
+    let jitterY = y + random(-40, 40);
 
     push();
-    // ^ save the current drawing state (position, rotation) so our changes
-    // below don't permanently affect anything drawn after this loop iteration
-
     translate(jitterX, jitterY);
-    // move to this shape's specific jittered position
-
-    // NEW: random rotation
-    // random(TWO_PI) picks a random angle between 0 and 2π (a full circle)
-    // rotate() spins the coordinate system by that angle before we draw
     rotate(random(TWO_PI));
 
-    // NEW: random size and transparency for variety
-    let size = random(10, 40);       // random diameter each time
-    let alpha = random(50, 150);      // random transparency (0=invisible, 255=solid)
+    let hue = random(260, 300);
+    let sat = random(40, 80);
+    let bright = random(60, 95);
+    let alpha = random(30, 70);
 
-    noStroke();                       // no outline on the shape
-    fill(80, 80, 200, alpha);         // blue-ish fill, with randomized transparency
-    ellipse(0, 0, size, size * 0.4);
-    // ^ draw an ellipse AT THE ORIGIN (0,0) - because we already translated
-    // to jitterX/jitterY above, "0,0" here actually means "the jittered point"
-    // size*0.4 makes it a flattened oval instead of a perfect circle, since
-    // it's now rotated randomly, flattened ellipses look more dynamic than circles
+    noStroke();
+    fill(hue, sat, bright, alpha);
+
+    let size = random(15, 50);
+    ellipse(0, 0, size, size * random(0.3, 0.6));
 
     pop();
-    // ^ restore the drawing state back to before this loop's translate/rotate
-    // without this, rotations and translations would STACK UP across iterations
   }
+  pop();  // NEW: undo the width/2, height/2 shift - back to true (0,0) top-left
 
-  t += speed;  // advance time, so next frame's 40 shapes sit at a new curve position
+  t += speed;
+
+  image(noiseTexture, 0, 0);
+  // ^ now this runs in the TRUE coordinate space, so it correctly covers the whole canvas
+}
+
+function windowResized() {
+  // ^ p5 calls this automatically whenever the browser window changes size
+  resizeCanvas(windowWidth, windowHeight);
+  // ^ resize the actual canvas to match the new window size
+
+  radius = min(windowWidth, windowHeight) * 0.3;
+  // ^ recalculate radius so the curve still looks proportional after resizing
+
+  // NOTE: we do NOT rebuild noiseTexture here on every resize, since looping over
+  // every pixel is slow - for now it'll just stretch/mismatch slightly on resize.
+  // We can fix that properly later if you end up resizing often during testing.
 }
